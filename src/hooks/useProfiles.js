@@ -13,6 +13,7 @@ export function useProfiles() {
         .select('*')
         .order('full_name', { ascending: true });
       if (!cancelled && !error) setProfiles(data || []);
+      if (error) console.error('Profiles load error:', error);
       setLoading(false);
     })();
     return () => { cancelled = true; };

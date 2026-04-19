@@ -11,6 +11,8 @@ export function useSettings() {
       const map = {};
       data.forEach(row => { map[row.key] = row.value; });
       setSettings(map);
+    } else if (error) {
+      console.error('Settings load error:', error);
     }
     setLoading(false);
   }, []);

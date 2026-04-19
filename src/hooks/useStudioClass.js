@@ -8,10 +8,12 @@ export function useStudioClass() {
   const [loading, setLoading] = useState(true);
 
   const fetch = useCallback(async () => {
-    const [{ data: s }, { data: p }] = await Promise.all([
+    const [{ data: s, error: sessionsError }, { data: p, error: piecesError }] = await Promise.all([
       supabase.from('studio_class').select('*').order('session_date', { ascending: false }),
       supabase.from('studio_pieces').select('*').order('created_at', { ascending: true }),
     ]);
+    if (sessionsError) console.error('Studio class load error:', sessionsError);
+    if (piecesError) console.error('Studio pieces load error:', piecesError);
     setSessions(s || []);
     setPieces(p || []);
     setLoading(false);
