@@ -18,7 +18,7 @@ export function useSettings() {
   useEffect(() => {
     fetch();
     const channel = supabase
-      .channel('settings')
+      .channel(`settings-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => fetch())
       .subscribe();
     return () => { supabase.removeChannel(channel); };

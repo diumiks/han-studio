@@ -20,7 +20,7 @@ export function useStudioClass() {
   useEffect(() => {
     fetch();
     const channel = supabase
-      .channel('studio-class-all')
+      .channel(`studio-class-all-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'studio_class' }, () => fetch())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'studio_pieces' }, () => fetch())
       .subscribe();
