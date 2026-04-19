@@ -44,6 +44,30 @@ create table if not exists public.studio_class (
   created_at timestamptz not null default now()
 );
 
+-- Allowed-emails roster. Students can only sign up if their email is here
+-- (or matches the admin_email setting). Chi Ho adds emails on the Students page.
+create table if not exists public.allowed_emails (
+  email text primary key,
+  full_name text not null default '',
+  added_at timestamptz not null default now()
+);
+
+-- Swap requests (one student asking another to trade lesson slots).
+create table if not exists public.swap_requests (
+  id uuid primary key default gen_random_uuid(),
+  requester_id uuid not null references public.profiles(id) on delete cascade,
+  requester_slot_id uuid not null references public.slots(id) on delete cascade,
+  target_id uuid not null references public.profiles(id) on delete cascade,
+  target_slot_id uuid not null references public.slots(id) on delete cascade,
+  status text not null default 'pending'
+    check (status in ('pending', 'accepted', 'declined', 'cancelled')),
+  message text not null default '',
+  created_at timestamptz not null default now(),
+  responded_at timestamptz
+);
+create index if not exists idx_swap_target on public.swap_requests(target_id, status);
+create index if not exists idx_swap_requester on public.swap_requests(requester_id, status);
+
 -- Pieces signed up for a studio class. One student can add multiple pieces.
 create table if not exists public.studio_pieces (
   id uuid primary key default gen_random_uuid(),
@@ -71,6 +95,7 @@ insert into public.settings (key, value) values
   ('announcement', ''),
   ('studio_default_day', 'Tuesday'),
   ('studio_default_time', '19:30'),
+  ('studio_default_location', ''),
   ('lessons_per_semester', '14'),
   ('announcements_page',
 '## Cancellation policy
@@ -124,16 +149,28 @@ set search_path = public
 as $$
 declare
   admin_email text;
+  is_allowed boolean;
+  invite_name text;
 begin
-  -- Read the configured admin email from settings, if present
   select value into admin_email from public.settings where key = 'admin_email';
+
+  select exists(select 1 from public.allowed_emails where lower(email) = lower(new.email))
+  into is_allowed;
+
+  -- Gate: only the configured admin or emails on the allowed_emails roster.
+  if lower(coalesce(new.email, '')) <> lower(coalesce(admin_email, '')) and not is_allowed then
+    raise exception 'Email % is not on the studio roster. Ask Chi Ho to add you first.', new.email;
+  end if;
+
+  select full_name into invite_name from public.allowed_emails
+  where lower(email) = lower(new.email);
 
   insert into public.profiles (id, email, full_name, role)
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data->>'full_name', ''),
-    case when new.email = admin_email then 'admin' else 'student' end
+    coalesce(nullif(new.raw_user_meta_data->>'full_name', ''), coalesce(invite_name, '')),
+    case when lower(new.email) = lower(admin_email) then 'admin' else 'student' end
   );
   return new;
 end;
@@ -154,6 +191,8 @@ alter table public.slots enable row level security;
 alter table public.studio_class enable row level security;
 alter table public.studio_pieces enable row level security;
 alter table public.settings enable row level security;
+alter table public.allowed_emails enable row level security;
+alter table public.swap_requests enable row level security;
 
 -- PROFILES: authenticated users can read everyone's name (to show bookings).
 -- Only admins can modify role; users can update their own name.
@@ -164,6 +203,10 @@ create policy "profiles_read" on public.profiles
 drop policy if exists "profiles_update_self" on public.profiles;
 create policy "profiles_update_self" on public.profiles
   for update using (auth.uid() = id);
+
+drop policy if exists "profiles_update_admin" on public.profiles;
+create policy "profiles_update_admin" on public.profiles
+  for update using (public.is_admin()) with check (public.is_admin());
 
 -- SLOTS: everyone authenticated can read. Only admin can insert/delete.
 -- Booking (update) is allowed if the user is booking/cancelling their own slot
@@ -187,10 +230,13 @@ create policy "slots_update" on public.slots
     or (
       auth.uid() is not null
       and (
-        -- booking an open slot: must be allowed by restrictedTo (or no restriction)
+        -- booking an open slot: must be allowed by restricted_to (or no restriction)
         (booked_by is null and (restricted_to is null or auth.uid() = any(restricted_to)))
-        -- cancelling own booking
-        or booked_by = auth.uid()
+        -- cancelling own booking: only if lesson starts more than 24h from now
+        or (
+          booked_by = auth.uid()
+          and (slot_date + slot_time) > ((now() at time zone 'America/Indiana/Indianapolis')::timestamp + interval '24 hours')
+        )
       )
     )
   );
@@ -230,6 +276,69 @@ drop policy if exists "settings_write_admin" on public.settings;
 create policy "settings_write_admin" on public.settings
   for all using (public.is_admin()) with check (public.is_admin());
 
+-- ALLOWED_EMAILS: admin manages, everyone reads (to verify before signup UX).
+drop policy if exists "allowed_emails_read" on public.allowed_emails;
+create policy "allowed_emails_read" on public.allowed_emails
+  for select using (auth.uid() is not null);
+
+drop policy if exists "allowed_emails_write_admin" on public.allowed_emails;
+create policy "allowed_emails_write_admin" on public.allowed_emails
+  for all using (public.is_admin()) with check (public.is_admin());
+
+-- SWAP REQUESTS: parties + admin can read; requester creates; either party or admin updates.
+drop policy if exists "swap_read" on public.swap_requests;
+create policy "swap_read" on public.swap_requests
+  for select using (
+    auth.uid() = requester_id or auth.uid() = target_id or public.is_admin()
+  );
+
+drop policy if exists "swap_insert" on public.swap_requests;
+create policy "swap_insert" on public.swap_requests
+  for insert with check (auth.uid() = requester_id);
+
+drop policy if exists "swap_update" on public.swap_requests;
+create policy "swap_update" on public.swap_requests
+  for update using (
+    auth.uid() = requester_id or auth.uid() = target_id or public.is_admin()
+  );
+
+-- Atomic swap executor.
+create or replace function public.accept_swap_request(req_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r public.swap_requests%rowtype;
+begin
+  select * into r from public.swap_requests where id = req_id for update;
+  if not found then raise exception 'Swap request not found.'; end if;
+  if r.status <> 'pending' then raise exception 'This request has already been resolved.'; end if;
+  if r.target_id <> auth.uid() and not public.is_admin() then
+    raise exception 'Only the recipient can accept this swap.';
+  end if;
+
+  perform 1 from public.slots where id = r.requester_slot_id and booked_by = r.requester_id;
+  if not found then raise exception 'The requester no longer holds their slot.'; end if;
+  perform 1 from public.slots where id = r.target_slot_id and booked_by = r.target_id;
+  if not found then raise exception 'The target no longer holds their slot.'; end if;
+
+  update public.slots set booked_by = r.target_id where id = r.requester_slot_id;
+  update public.slots set booked_by = r.requester_id where id = r.target_slot_id;
+
+  update public.swap_requests
+    set status = 'cancelled', responded_at = now()
+    where status = 'pending' and id <> req_id
+      and (requester_slot_id in (r.requester_slot_id, r.target_slot_id)
+           or target_slot_id in (r.requester_slot_id, r.target_slot_id));
+
+  update public.swap_requests
+    set status = 'accepted', responded_at = now()
+    where id = req_id;
+end;
+$$;
+
 -- -----------------------------------------------------------------------------
 -- Enable realtime on slots + pieces so bookings update live
 -- -----------------------------------------------------------------------------
@@ -238,3 +347,4 @@ alter publication supabase_realtime add table public.slots;
 alter publication supabase_realtime add table public.studio_pieces;
 alter publication supabase_realtime add table public.studio_class;
 alter publication supabase_realtime add table public.settings;
+alter publication supabase_realtime add table public.swap_requests;

@@ -36,6 +36,7 @@ export default function StudioClass() {
 
   const defaultDay = settings.studio_default_day || 'Tuesday';
   const defaultTime = settings.studio_default_time || '19:30';
+  const defaultLocation = settings.studio_default_location || '';
 
   // Show a virtual "next default" only if no explicit upcoming session exists,
   // OR the next explicit session is further out than the next default would be.
@@ -64,6 +65,7 @@ export default function StudioClass() {
             <VirtualSession
               date={virtualDate}
               time={defaultTime}
+              location={defaultLocation}
               isAdmin={isAdmin}
               refetch={refetch}
             />
@@ -120,7 +122,7 @@ function EmptyCard({ isAdmin }) {
 // Virtual session — computed from defaults when no real row exists yet.
 // -----------------------------------------------------------------------------
 
-function VirtualSession({ date, time, isAdmin, refetch }) {
+function VirtualSession({ date, time, location, isAdmin, refetch }) {
   const [busy, setBusy] = useState(false);
 
   const open = async () => {
@@ -128,7 +130,7 @@ function VirtualSession({ date, time, isAdmin, refetch }) {
     await supabase.from('studio_class').insert({
       session_date: date,
       session_time: time,
-      location: '',
+      location: location || '',
     });
     setBusy(false);
     refetch();
@@ -156,6 +158,7 @@ function VirtualSession({ date, time, isAdmin, refetch }) {
       </div>
       <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4 }}>
         <span className="font-mono">{fmtTime(time)}</span>
+        {location && <> · {location}</>}
       </div>
       <p style={{ fontSize: 12.5, color: 'var(--ink-mute)', fontStyle: 'italic', marginTop: 16, marginBottom: isAdmin ? 14 : 0 }} className="font-serif">
         {isAdmin
@@ -538,6 +541,7 @@ function AdminDefaults() {
   const { settings, update } = useSettings();
   const [day, setDay] = useState(settings.studio_default_day || 'Tuesday');
   const [time, setTime] = useState((settings.studio_default_time || '19:30').slice(0, 5));
+  const [location, setLocation] = useState(settings.studio_default_location || '');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -545,6 +549,7 @@ function AdminDefaults() {
     setBusy(true);
     await update('studio_default_day', day);
     await update('studio_default_time', time);
+    await update('studio_default_location', location);
     setBusy(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
@@ -552,7 +557,8 @@ function AdminDefaults() {
 
   const currentDay = settings.studio_default_day || 'Tuesday';
   const currentTime = (settings.studio_default_time || '19:30').slice(0, 5);
-  const dirty = day !== currentDay || time !== currentTime;
+  const currentLocation = settings.studio_default_location || '';
+  const dirty = day !== currentDay || time !== currentTime || location !== currentLocation;
 
   return (
     <section style={{ marginTop: 56, paddingTop: 32, borderTop: '0.5px solid var(--rule)' }}>
@@ -572,6 +578,8 @@ function AdminDefaults() {
           {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
         <input type="time" value={time} onChange={e => setTime(e.target.value)} style={miniInput} />
+        <input type="text" value={location} onChange={e => setLocation(e.target.value)}
+          placeholder="Default location (e.g. MA 405)" style={{ ...miniInput, width: 220 }} />
         <Button onClick={save} size="sm" disabled={busy || !dirty}>
           {busy ? 'Saving…' : saved ? 'Saved' : 'Save defaults'}
         </Button>
@@ -588,7 +596,7 @@ function AdminCreateSession({ refetch }) {
   const { settings } = useSettings();
   const [date, setDate] = useState('');
   const [time, setTime] = useState((settings.studio_default_time || '19:30').slice(0, 5));
-  const [location, setLocation] = useState('');
+  const [location, setLocation] = useState(settings.studio_default_location || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 

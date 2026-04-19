@@ -42,6 +42,16 @@ export const todayISO = () => {
   return `${y}-${m}-${day}`;
 };
 
+// Hours from now until the given slot (slot_date + slot_time, interpreted as
+// local/Bloomington naive time). Negative if the slot is already past.
+export const hoursUntilSlot = (slotDate, slotTime) => {
+  if (!slotDate || !slotTime) return Infinity;
+  const [h, m] = slotTime.split(':').map(Number);
+  const [y, mo, d] = slotDate.split('-').map(Number);
+  const start = new Date(y, mo - 1, d, h, m, 0, 0);
+  return (start.getTime() - Date.now()) / (1000 * 60 * 60);
+};
+
 // Start-of-week (Monday) ISO date for the week containing `date`
 export const weekStart = (dateISO) => {
   const d = new Date(dateISO + 'T12:00:00');

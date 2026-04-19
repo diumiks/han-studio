@@ -10,6 +10,7 @@ import Policy from './pages/student/Policy.jsx';
 import Schedule from './pages/admin/Schedule.jsx';
 import OpenSlots from './pages/admin/OpenSlots.jsx';
 import Students from './pages/admin/Students.jsx';
+import StudentDetail from './pages/admin/StudentDetail.jsx';
 
 import StudioClass from './pages/StudioClass.jsx';
 
@@ -72,6 +73,7 @@ function AppRoutes() {
       <Route path="/schedule" element={<Protected adminOnly><Schedule /></Protected>} />
       <Route path="/open-slots" element={<Protected adminOnly><OpenSlots /></Protected>} />
       <Route path="/students" element={<Protected adminOnly><Students /></Protected>} />
+      <Route path="/students/:id" element={<Protected adminOnly><StudentDetail /></Protected>} />
 
       {/* Root redirects based on role */}
       <Route path="/" element={
