@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --paper: #F7F4ED;
+  --paper-soft: #EFEADF;
+  --paper-warm: #E8E1D1;
+  --ink: #1C1B18;
+  --ink-soft: #4A4842;
+  --ink-mute: #7A7770;
+  --ink-faint: #A8A49A;
+  --rule: #D4CEBF;
+  --rule-soft: #E4DED0;
+  --accent: #9B2D1F;
+  --accent-soft: #C85D4A;
+  --green: #2D4A3E;
+  --green-soft: #E2EAE4;
+}
+
+* { box-sizing: border-box; }
+
+body, html, #root {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+.font-serif { font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; }
+.font-mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; padding: 0; }
+input, select, textarea { font-family: inherit; color: inherit; }
+
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 1.5px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar::-webkit-scrollbar-track { background: transparent; }
+.scrollbar::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 3px; }
+
+@keyframes fadeSlide { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.anim-fade { animation: fadeSlide 0.25s ease-out; }
+
+@media (max-width: 768px) {
+  .responsive-sidebar { width: 100% !important; height: auto !important; position: static !important; }
+}
