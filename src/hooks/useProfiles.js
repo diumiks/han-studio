@@ -1,29 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 
 export function useProfiles() {
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('full_name', { ascending: true });
-      if (!cancelled && !error) setProfiles(data || []);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
+  const fetch = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('full_name', { ascending: true });
+    if (!error) setProfiles(data || []);
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
 
   const byId = (id) => profiles.find(p => p.id === id);
   const displayName = (id) => {
     const p = byId(id);
     return p?.full_name || p?.email?.split('@')[0] || 'Unknown';
   };
-  const students = profiles.filter(p => p.role === 'student');
+  const students = profiles.filter(p => p.role === 'student' && !p.archived);
+  const archivedStudents = profiles.filter(p => p.role === 'student' && p.archived);
 
-  return { profiles, students, loading, byId, displayName };
+  return { profiles, students, archivedStudents, loading, byId, displayName, refetch: fetch };
 }

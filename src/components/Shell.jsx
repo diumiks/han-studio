@@ -12,14 +12,14 @@ export default function Shell({ children }) {
     { to: '/book', label: 'Book a lesson', icon: Calendar },
     { to: '/my-lessons', label: 'My lessons', icon: Clock },
     { to: '/studio-class', label: 'Studio class', icon: Users },
-    { to: '/policy', label: 'Policy', icon: FileText },
+    { to: '/policy', label: 'Announcements', icon: FileText },
   ];
   const adminNav = [
     { to: '/schedule', label: 'Schedule', icon: Calendar },
     { to: '/open-slots', label: 'Open slots', icon: Plus },
     { to: '/studio-class', label: 'Studio class', icon: Users },
     { to: '/students', label: 'Students', icon: BookOpen },
-    { to: '/policy', label: 'Policy', icon: FileText },
+    { to: '/policy', label: 'Announcements', icon: FileText },
   ];
   const nav = isAdmin ? adminNav : studentNav;
 

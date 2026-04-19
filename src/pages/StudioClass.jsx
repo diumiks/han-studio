@@ -1,14 +1,31 @@
 import { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Ban, Undo2 } from 'lucide-react';
 import { useAuth } from '../lib/auth.jsx';
 import { useStudioClass } from '../hooks/useStudioClass.js';
 import { useProfiles } from '../hooks/useProfiles.js';
 import { useSettings } from '../hooks/useSettings.js';
 import { supabase } from '../lib/supabase.js';
-import { fmtDate, fmtTime } from '../lib/dateUtils.js';
+import { fmtDate, fmtTime, todayISO } from '../lib/dateUtils.js';
 import PageHeader from '../components/PageHeader.jsx';
 import Button from '../components/Button.jsx';
-import Pill from '../components/Pill.jsx';
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// Compute the next occurrence (YYYY-MM-DD) of the given weekday name, strictly after today.
+function nextOccurrenceOf(dayName) {
+  const targetDow = DAYS.indexOf(dayName);
+  if (targetDow < 0) return null;
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  const today = d.getDay();
+  let offset = (targetDow - today + 7) % 7;
+  if (offset === 0) offset = 7; // always the next upcoming one, not today
+  d.setDate(d.getDate() + offset);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 export default function StudioClass() {
   const { profile } = useAuth();
@@ -17,26 +34,43 @@ export default function StudioClass() {
   const { displayName } = useProfiles();
   const { settings } = useSettings();
 
+  const defaultDay = settings.studio_default_day || 'Tuesday';
+  const defaultTime = settings.studio_default_time || '19:30';
+
+  // If no real upcoming session exists, compute a virtual one from defaults.
+  const virtualDate = !upcoming ? nextOccurrenceOf(defaultDay) : null;
+
   return (
     <>
       <PageHeader
         eyebrow="Weekly gathering"
         title="Studio class"
-        subtitle={`Default: ${settings.studio_default_day || 'Tuesday'}s at ${(settings.studio_default_time || '19:30').slice(0, 5)}. Chi Ho may adjust for a given week.`}
+        subtitle={`Default: ${defaultDay}s at ${defaultTime.slice(0, 5)}. Chi Ho may adjust for a given week.`}
       />
 
       {loading ? (
         <p style={{ fontSize: 13, color: 'var(--ink-mute)', fontStyle: 'italic' }} className="font-serif">Loading…</p>
       ) : (
         <>
-          <UpcomingSession
-            session={upcoming}
-            isAdmin={isAdmin}
-            profile={profile}
-            piecesFor={piecesFor}
-            displayName={displayName}
-            refetch={refetch}
-          />
+          {upcoming ? (
+            <UpcomingSession
+              session={upcoming}
+              isAdmin={isAdmin}
+              profile={profile}
+              piecesFor={piecesFor}
+              displayName={displayName}
+              refetch={refetch}
+            />
+          ) : virtualDate ? (
+            <VirtualSession
+              date={virtualDate}
+              time={defaultTime}
+              isAdmin={isAdmin}
+              refetch={refetch}
+            />
+          ) : (
+            <EmptyCard isAdmin={isAdmin} />
+          )}
 
           <PastSessions
             past={past}
@@ -44,6 +78,7 @@ export default function StudioClass() {
             displayName={displayName}
           />
 
+          {isAdmin && <AdminDefaults />}
           {isAdmin && <AdminCreateSession refetch={refetch} />}
         </>
       )}
@@ -52,7 +87,79 @@ export default function StudioClass() {
 }
 
 // -----------------------------------------------------------------------------
-// Upcoming session card (with programme + sign-up)
+// Empty state (no defaults set, no session scheduled)
+// -----------------------------------------------------------------------------
+
+function EmptyCard({ isAdmin }) {
+  return (
+    <div style={dashedCard}>
+      <p className="font-serif" style={{ fontStyle: 'italic', margin: 0 }}>
+        No upcoming studio class scheduled.
+      </p>
+      {isAdmin && <p style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+        Set a default day/time below, or create a one-off session.
+      </p>}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Virtual session — computed from defaults when no real row exists yet.
+// -----------------------------------------------------------------------------
+
+function VirtualSession({ date, time, isAdmin, refetch }) {
+  const [busy, setBusy] = useState(false);
+
+  const open = async () => {
+    setBusy(true);
+    await supabase.from('studio_class').insert({
+      session_date: date,
+      session_time: time,
+      location: '',
+    });
+    setBusy(false);
+    refetch();
+  };
+
+  return (
+    <div style={{
+      border: '0.5px dashed var(--rule)',
+      padding: 28,
+      marginBottom: 40,
+      borderRadius: 2,
+      background: 'var(--paper)',
+    }}>
+      <div style={{
+        fontSize: 10,
+        letterSpacing: '0.16em',
+        textTransform: 'uppercase',
+        color: 'var(--ink-mute)',
+        marginBottom: 6,
+      }}>
+        Next session · from defaults
+      </div>
+      <div className="font-serif" style={{ fontSize: 26, fontStyle: 'italic', lineHeight: 1.1 }}>
+        {fmtDate(date)}
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4 }}>
+        <span className="font-mono">{fmtTime(time)}</span>
+      </div>
+      <p style={{ fontSize: 12.5, color: 'var(--ink-mute)', fontStyle: 'italic', marginTop: 16, marginBottom: isAdmin ? 14 : 0 }} className="font-serif">
+        {isAdmin
+          ? 'Open this session to allow students to sign up pieces, or change the default below.'
+          : 'Chi Ho will open this session soon. Sign-ups will appear here.'}
+      </p>
+      {isAdmin && (
+        <Button onClick={open} size="sm" disabled={busy}>
+          {busy ? 'Opening…' : 'Open this session'}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Upcoming session card (with programme + sign-up + cancel)
 // -----------------------------------------------------------------------------
 
 function UpcomingSession({ session, isAdmin, profile, piecesFor, displayName, refetch }) {
@@ -61,31 +168,9 @@ function UpcomingSession({ session, isAdmin, profile, piecesFor, displayName, re
   const [tempTime, setTempTime] = useState('');
   const [tempLocation, setTempLocation] = useState('');
 
-  if (!session) {
-    return (
-      <div style={{
-        border: '0.5px dashed var(--rule)',
-        padding: 28,
-        marginBottom: 40,
-        borderRadius: 2,
-        background: 'var(--paper)',
-        textAlign: 'center',
-        color: 'var(--ink-mute)',
-        fontSize: 14,
-      }}>
-        <p className="font-serif" style={{ fontStyle: 'italic', margin: 0 }}>
-          No upcoming studio class scheduled.
-        </p>
-        {isAdmin && <p style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-          Create one using the form below.
-        </p>}
-      </div>
-    );
-  }
-
   const openEditSchedule = () => {
     setTempDate(session.session_date);
-    setTempTime(session.session_time.slice(0, 5));
+    setTempTime((session.session_time || '19:30').slice(0, 5));
     setTempLocation(session.location || '');
     setEditSchedule(true);
   };
@@ -99,7 +184,24 @@ function UpcomingSession({ session, isAdmin, profile, piecesFor, displayName, re
     refetch();
   };
 
+  const toggleCancel = async () => {
+    const next = !session.cancelled;
+    const msg = next
+      ? 'Cancel this studio class? Students will see it marked as cancelled.'
+      : 'Un-cancel this studio class?';
+    if (!confirm(msg)) return;
+    await supabase.from('studio_class').update({ cancelled: next }).eq('id', session.id);
+    refetch();
+  };
+
+  const removeSession = async () => {
+    if (!confirm('Delete this session entirely? All piece sign-ups will be removed.')) return;
+    await supabase.from('studio_class').delete().eq('id', session.id);
+    refetch();
+  };
+
   const pieces = piecesFor(session.id);
+  const cancelled = session.cancelled;
 
   return (
     <div style={{
@@ -108,6 +210,7 @@ function UpcomingSession({ session, isAdmin, profile, piecesFor, displayName, re
       marginBottom: 40,
       borderRadius: 2,
       background: 'var(--paper)',
+      opacity: cancelled ? 0.72 : 1,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 20 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -115,14 +218,19 @@ function UpcomingSession({ session, isAdmin, profile, piecesFor, displayName, re
             fontSize: 10,
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
-            color: 'var(--ink-mute)',
+            color: cancelled ? 'var(--accent)' : 'var(--ink-mute)',
             marginBottom: 6,
           }}>
-            Next session
+            {cancelled ? 'Cancelled' : 'Next session'}
           </div>
           {!editSchedule ? (
             <>
-              <div className="font-serif" style={{ fontSize: 26, fontStyle: 'italic', lineHeight: 1.1 }}>
+              <div className="font-serif" style={{
+                fontSize: 26,
+                fontStyle: 'italic',
+                lineHeight: 1.1,
+                textDecoration: cancelled ? 'line-through' : 'none',
+              }}>
                 {fmtDate(session.session_date)}
               </div>
               <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4 }}>
@@ -148,31 +256,49 @@ function UpcomingSession({ session, isAdmin, profile, piecesFor, displayName, re
               <Button onClick={() => setEditSchedule(false)} variant="ghost" size="sm">Cancel</Button>
             </div>
           ) : (
-            <Button onClick={openEditSchedule} variant="secondary" size="sm">Reschedule</Button>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <Button onClick={openEditSchedule} variant="secondary" size="sm">Reschedule</Button>
+              <Button onClick={toggleCancel} variant="ghost" size="sm">
+                {cancelled ? (
+                  <><Undo2 size={12} strokeWidth={1.5} /> Un-cancel</>
+                ) : (
+                  <><Ban size={12} strokeWidth={1.5} /> Cancel</>
+                )}
+              </Button>
+              <Button onClick={removeSession} variant="ghost" size="sm">Delete</Button>
+            </div>
           )
         )}
       </div>
 
-      <div style={{ height: 1, background: 'var(--rule)', margin: '12px 0 20px' }} />
-      <div style={{
-        fontSize: 10,
-        letterSpacing: '0.16em',
-        textTransform: 'uppercase',
-        color: 'var(--ink-mute)',
-        marginBottom: 12,
-      }}>
-        Programme
-      </div>
+      {cancelled ? (
+        <p className="font-serif" style={{ fontStyle: 'italic', color: 'var(--ink-mute)', fontSize: 13, margin: 0 }}>
+          This studio class has been cancelled.
+        </p>
+      ) : (
+        <>
+          <div style={{ height: 1, background: 'var(--rule)', margin: '12px 0 20px' }} />
+          <div style={{
+            fontSize: 10,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'var(--ink-mute)',
+            marginBottom: 12,
+          }}>
+            Programme
+          </div>
 
-      <Programme
-        pieces={pieces}
-        displayName={displayName}
-        canDelete={(p) => isAdmin || p.student_id === profile.id}
-        refetch={refetch}
-      />
+          <Programme
+            pieces={pieces}
+            displayName={displayName}
+            canDelete={(p) => isAdmin || p.student_id === profile.id}
+            refetch={refetch}
+          />
 
-      {!isAdmin && (
-        <SignUpMyPiece sessionId={session.id} studentId={profile.id} refetch={refetch} />
+          {!isAdmin && (
+            <SignUpMyPiece sessionId={session.id} studentId={profile.id} refetch={refetch} />
+          )}
+        </>
       )}
     </div>
   );
@@ -310,9 +436,7 @@ function SignUpMyPiece({ sessionId, studentId, refetch }) {
 function PastSessions({ past, piecesFor, displayName }) {
   const [expanded, setExpanded] = useState(null);
 
-  if (past.length === 0) {
-    return null;
-  }
+  if (past.length === 0) return null;
 
   return (
     <section>
@@ -345,11 +469,16 @@ function PastSessions({ past, piecesFor, displayName }) {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-                  <span className="font-serif" style={{ fontSize: 16, fontStyle: 'italic' }}>
+                  <span className="font-serif" style={{
+                    fontSize: 16,
+                    fontStyle: 'italic',
+                    textDecoration: session.cancelled ? 'line-through' : 'none',
+                    color: session.cancelled ? 'var(--ink-mute)' : 'var(--ink)',
+                  }}>
                     {fmtDate(session.session_date)}
                   </span>
                   <span style={{ fontSize: 12, color: 'var(--ink-mute)' }}>
-                    {pieces.length} piece{pieces.length !== 1 ? 's' : ''}
+                    {session.cancelled ? 'cancelled' : `${pieces.length} piece${pieces.length !== 1 ? 's' : ''}`}
                   </span>
                 </div>
                 <span style={{ fontSize: 11, color: 'var(--ink-mute)' }}>
@@ -389,7 +518,57 @@ function PastSessions({ past, piecesFor, displayName }) {
 }
 
 // -----------------------------------------------------------------------------
-// Admin: create a new studio class session
+// Admin: edit default day/time
+// -----------------------------------------------------------------------------
+
+function AdminDefaults() {
+  const { settings, update } = useSettings();
+  const [day, setDay] = useState(settings.studio_default_day || 'Tuesday');
+  const [time, setTime] = useState((settings.studio_default_time || '19:30').slice(0, 5));
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    await update('studio_default_day', day);
+    await update('studio_default_time', time);
+    setBusy(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  };
+
+  const currentDay = settings.studio_default_day || 'Tuesday';
+  const currentTime = (settings.studio_default_time || '19:30').slice(0, 5);
+  const dirty = day !== currentDay || time !== currentTime;
+
+  return (
+    <section style={{ marginTop: 56, paddingTop: 32, borderTop: '0.5px solid var(--rule)' }}>
+      <h2 className="font-serif" style={{
+        fontSize: 18,
+        fontStyle: 'italic',
+        fontWeight: 400,
+        margin: '0 0 6px',
+      }}>
+        Studio class defaults
+      </h2>
+      <p style={{ fontSize: 12.5, color: 'var(--ink-mute)', margin: '0 0 16px' }}>
+        When no session is explicitly scheduled, the student page automatically shows the next occurrence of this day/time.
+      </p>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select value={day} onChange={e => setDay(e.target.value)} style={miniInput}>
+          {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <input type="time" value={time} onChange={e => setTime(e.target.value)} style={miniInput} />
+        <Button onClick={save} size="sm" disabled={busy || !dirty}>
+          {busy ? 'Saving…' : saved ? 'Saved' : 'Save defaults'}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Admin: create a new studio class session (one-off)
 // -----------------------------------------------------------------------------
 
 function AdminCreateSession({ refetch }) {
@@ -418,14 +597,14 @@ function AdminCreateSession({ refetch }) {
   };
 
   return (
-    <section style={{ marginTop: 56, paddingTop: 32, borderTop: '0.5px solid var(--rule)' }}>
+    <section style={{ marginTop: 40, paddingTop: 32, borderTop: '0.5px solid var(--rule)' }}>
       <h2 className="font-serif" style={{
         fontSize: 18,
         fontStyle: 'italic',
         fontWeight: 400,
         margin: '0 0 16px',
       }}>
-        Create a new session
+        Create a one-off session
       </h2>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={miniInput} />
@@ -446,4 +625,15 @@ const miniInput = {
   borderRadius: 2,
   background: 'transparent',
   color: 'var(--ink)',
+};
+
+const dashedCard = {
+  border: '0.5px dashed var(--rule)',
+  padding: 28,
+  marginBottom: 40,
+  borderRadius: 2,
+  background: 'var(--paper)',
+  textAlign: 'center',
+  color: 'var(--ink-mute)',
+  fontSize: 14,
 };

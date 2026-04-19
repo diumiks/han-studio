@@ -16,6 +16,7 @@ create table if not exists public.profiles (
   email text not null unique,
   full_name text not null default '',
   role text not null default 'student' check (role in ('student', 'admin')),
+  archived boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -70,7 +71,27 @@ insert into public.settings (key, value) values
   ('announcement', ''),
   ('studio_default_day', 'Tuesday'),
   ('studio_default_time', '19:30'),
-  ('lessons_per_semester', '14')
+  ('lessons_per_semester', '14'),
+  ('announcements_page',
+'## Cancellation policy
+
+Your lesson time is protected for you alone. Please give others the chance to use it if you cannot.
+
+**Cancelling your own lesson.** You may cancel any booked lesson through this app. The slot returns to the pool. No penalty.
+
+**Swapping with another student.** Arrange it directly by email or text. Once agreed, both of you cancel and rebook in the app.
+
+**Late cancellations.** Please try to give at least 24 hours notice when possible. Life happens — illness, emergencies, recitals.
+
+**If Chi Ho cancels.** You will see a note on the Book page and the affected slots will disappear. A make-up week is typically offered the following month.
+
+## Concerto this year
+
+(Chi Ho — edit this section with the current concerto repertoire, soloists, and performance dates.)
+
+## Summer festivals
+
+(Chi Ho — edit this section with summer festival information, audition deadlines, and travel notes.)')
 on conflict (key) do nothing;
 
 -- -----------------------------------------------------------------------------
