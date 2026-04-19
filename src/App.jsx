@@ -1,7 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
 import Shell from './components/Shell.jsx';
-import ErrorBoundary from './components/ErrorBoundary.jsx';
 import Login from './pages/Login.jsx';
 
 import Book from './pages/student/Book.jsx';
@@ -66,7 +65,7 @@ function AppRoutes() {
       <Route path="/my-lessons" element={<Protected><MyLessons /></Protected>} />
 
       {/* Shared */}
-      <Route path="/studio-class" element={<Protected><ErrorBoundary><StudioClass /></ErrorBoundary></Protected>} />
+      <Route path="/studio-class" element={<Protected><StudioClass /></Protected>} />
       <Route path="/policy" element={<Protected><Policy /></Protected>} />
 
       {/* Admin */}

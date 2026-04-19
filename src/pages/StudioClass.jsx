@@ -13,23 +13,16 @@ import Pill from '../components/Pill.jsx';
 export default function StudioClass() {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
-  const profileId = profile?.id ?? null;
   const { upcoming, past, piecesFor, loading, refetch } = useStudioClass();
   const { displayName } = useProfiles();
   const { settings } = useSettings();
-  const defaultStudioDay = typeof settings.studio_default_day === 'string' && settings.studio_default_day
-    ? settings.studio_default_day
-    : 'Tuesday';
-  const defaultStudioTime = typeof settings.studio_default_time === 'string' && settings.studio_default_time
-    ? settings.studio_default_time.slice(0, 5)
-    : '19:30';
 
   return (
     <>
       <PageHeader
         eyebrow="Weekly gathering"
         title="Studio class"
-        subtitle={`Default: ${defaultStudioDay}s at ${defaultStudioTime}. Chi Ho may adjust for a given week.`}
+        subtitle={`Default: ${settings.studio_default_day || 'Tuesday'}s at ${(settings.studio_default_time || '19:30').slice(0, 5)}. Chi Ho may adjust for a given week.`}
       />
 
       {loading ? (
@@ -40,7 +33,6 @@ export default function StudioClass() {
             session={upcoming}
             isAdmin={isAdmin}
             profile={profile}
-            profileId={profileId}
             piecesFor={piecesFor}
             displayName={displayName}
             refetch={refetch}
@@ -52,7 +44,7 @@ export default function StudioClass() {
             displayName={displayName}
           />
 
-          {isAdmin && <AdminCreateSession refetch={refetch} defaultTime={defaultStudioTime} />}
+          {isAdmin && <AdminCreateSession refetch={refetch} />}
         </>
       )}
     </>
@@ -63,7 +55,7 @@ export default function StudioClass() {
 // Upcoming session card (with programme + sign-up)
 // -----------------------------------------------------------------------------
 
-function UpcomingSession({ session, isAdmin, profile, profileId, piecesFor, displayName, refetch }) {
+function UpcomingSession({ session, isAdmin, profile, piecesFor, displayName, refetch }) {
   const [editSchedule, setEditSchedule] = useState(false);
   const [tempDate, setTempDate] = useState('');
   const [tempTime, setTempTime] = useState('');
@@ -93,7 +85,7 @@ function UpcomingSession({ session, isAdmin, profile, profileId, piecesFor, disp
 
   const openEditSchedule = () => {
     setTempDate(session.session_date);
-    setTempTime(typeof session.session_time === 'string' ? session.session_time.slice(0, 5) : '19:30');
+    setTempTime(session.session_time.slice(0, 5));
     setTempLocation(session.location || '');
     setEditSchedule(true);
   };
@@ -175,12 +167,12 @@ function UpcomingSession({ session, isAdmin, profile, profileId, piecesFor, disp
       <Programme
         pieces={pieces}
         displayName={displayName}
-        canDelete={(p) => isAdmin || (!!profileId && p.student_id === profileId)}
+        canDelete={(p) => isAdmin || p.student_id === profile.id}
         refetch={refetch}
       />
 
-      {!isAdmin && profileId && (
-        <SignUpMyPiece sessionId={session.id} studentId={profileId} refetch={refetch} />
+      {!isAdmin && (
+        <SignUpMyPiece sessionId={session.id} studentId={profile.id} refetch={refetch} />
       )}
     </div>
   );
@@ -400,9 +392,10 @@ function PastSessions({ past, piecesFor, displayName }) {
 // Admin: create a new studio class session
 // -----------------------------------------------------------------------------
 
-function AdminCreateSession({ refetch, defaultTime }) {
+function AdminCreateSession({ refetch }) {
+  const { settings } = useSettings();
   const [date, setDate] = useState('');
-  const [time, setTime] = useState(defaultTime || '19:30');
+  const [time, setTime] = useState((settings.studio_default_time || '19:30').slice(0, 5));
   const [location, setLocation] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
