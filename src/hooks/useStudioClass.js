@@ -9,7 +9,7 @@ export function useStudioClass() {
 
   const fetch = useCallback(async () => {
     const [{ data: s }, { data: p }] = await Promise.all([
-      supabase.from('studio_class').select('*').order('session_date', { ascending: false }),
+      supabase.from('studio_class').select('*').order('session_date', { ascending: true }),
       supabase.from('studio_pieces').select('*').order('created_at', { ascending: true }),
     ]);
     setSessions(s || []);
@@ -28,10 +28,14 @@ export function useStudioClass() {
   }, [fetch]);
 
   const today = todayISO();
-  const upcoming = sessions.find(s => s.session_date >= today);
-  const past = sessions.filter(s => s.session_date < today);
+  // All future-or-today sessions, soonest first.
+  const upcomingList = sessions.filter(s => s.session_date >= today);
+  // The very next session (for "virtual next" comparison).
+  const upcoming = upcomingList[0] || null;
+  // Past, most recent first.
+  const past = sessions.filter(s => s.session_date < today).slice().reverse();
 
   const piecesFor = (sessionId) => pieces.filter(p => p.session_id === sessionId);
 
-  return { sessions, pieces, upcoming, past, piecesFor, loading, refetch: fetch };
+  return { sessions, pieces, upcoming, upcomingList, past, piecesFor, loading, refetch: fetch };
 }

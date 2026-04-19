@@ -83,7 +83,7 @@ export default function OpenSlots() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48 }}>
+      <div className="responsive-open-slots-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48 }}>
         {/* Form column */}
         <div>
           <Field label="Date">

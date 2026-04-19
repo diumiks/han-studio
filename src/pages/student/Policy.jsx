@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Bold, Underline, Link as LinkIcon, Heading } from 'lucide-react';
 import { useAuth } from '../../lib/auth.jsx';
 import { useSettings } from '../../hooks/useSettings.js';
 import PageHeader from '../../components/PageHeader.jsx';
@@ -56,16 +57,79 @@ export default function Policy() {
 }
 
 // -----------------------------------------------------------------------------
-// Editor
+// Editor with simple toolbar (wraps selection with markers)
 // -----------------------------------------------------------------------------
 
 function Editor({ draft, setDraft, onSave, onCancel, busy }) {
+  const taRef = useRef(null);
+
+  const wrap = (before, after = before) => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const sel = draft.slice(start, end);
+    const next = draft.slice(0, start) + before + sel + after + draft.slice(end);
+    setDraft(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(start + before.length, end + before.length);
+    });
+  };
+
+  const insertLink = () => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const sel = draft.slice(start, end) || 'link text';
+    const url = prompt('Link URL (include https://):', 'https://');
+    if (!url) return;
+    const snippet = `[${sel}](${url})`;
+    const next = draft.slice(0, start) + snippet + draft.slice(end);
+    setDraft(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(start + 1, start + 1 + sel.length);
+    });
+  };
+
+  const insertHeading = () => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    // Find start of current line.
+    const lineStart = draft.lastIndexOf('\n', start - 1) + 1;
+    const next = draft.slice(0, lineStart) + '## ' + draft.slice(lineStart);
+    setDraft(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(start + 3, start + 3);
+    });
+  };
+
   return (
     <div style={{ maxWidth: 720 }}>
+      <div style={{
+        display: 'flex',
+        gap: 4,
+        marginBottom: 10,
+        padding: 4,
+        border: '0.5px solid var(--rule)',
+        borderRadius: 2,
+        background: 'var(--paper-soft)',
+        flexWrap: 'wrap',
+      }}>
+        <ToolbarBtn onClick={insertHeading} title="Heading"><Heading size={13} strokeWidth={1.6} /> Heading</ToolbarBtn>
+        <ToolbarBtn onClick={() => wrap('**')} title="Bold"><Bold size={13} strokeWidth={1.6} /> Bold</ToolbarBtn>
+        <ToolbarBtn onClick={() => wrap('__')} title="Underline"><Underline size={13} strokeWidth={1.6} /> Underline</ToolbarBtn>
+        <ToolbarBtn onClick={insertLink} title="Link"><LinkIcon size={13} strokeWidth={1.6} /> Link</ToolbarBtn>
+      </div>
       <p style={{ fontSize: 11.5, color: 'var(--ink-mute)', margin: '0 0 10px' }}>
-        Formatting: lines starting with <code>## </code> become section headings. Wrap text in <code>**double asterisks**</code> for bold. Blank lines separate paragraphs.
+        Markdown shortcuts: <code>## Heading</code>, <code>**bold**</code>, <code>__underline__</code>, <code>[text](https://url)</code>. Blank lines separate paragraphs.
       </p>
       <textarea
+        ref={taRef}
         value={draft}
         onChange={e => setDraft(e.target.value)}
         rows={28}
@@ -91,8 +155,32 @@ function Editor({ draft, setDraft, onSave, onCancel, busy }) {
   );
 }
 
+function ToolbarBtn({ onClick, title, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 5,
+        padding: '6px 10px',
+        fontSize: 12,
+        color: 'var(--ink-soft)',
+        border: '0.5px solid transparent',
+        borderRadius: 2,
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'var(--paper)'; e.currentTarget.style.borderColor = 'var(--rule)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
+    >
+      {children}
+    </button>
+  );
+}
+
 // -----------------------------------------------------------------------------
-// Render — minimal markdown: ## headings, **bold**, paragraphs, blank-line separated.
+// Render — minimal markdown: headings, bold, underline, links, paragraphs.
 // -----------------------------------------------------------------------------
 
 function Rendered({ content }) {
@@ -120,7 +208,7 @@ function Rendered({ content }) {
               color: 'var(--ink)',
               margin: i === 0 ? '0 0 16px' : '40px 0 16px',
             }}>
-              {trimmed.slice(3).trim()}
+              {renderInline(trimmed.slice(3).trim())}
             </h2>
           );
         }
@@ -133,7 +221,7 @@ function Rendered({ content }) {
               color: 'var(--ink)',
               margin: i === 0 ? '0 0 20px' : '48px 0 20px',
             }}>
-              {trimmed.slice(2).trim()}
+              {renderInline(trimmed.slice(2).trim())}
             </h1>
           );
         }
@@ -147,25 +235,69 @@ function Rendered({ content }) {
   );
 }
 
-// Very small inline parser: **bold** → <strong>. Newlines inside a paragraph → <br>.
+// Inline parser: **bold**, __underline__, [text](url). Newlines → <br>.
+// Tokenises by scanning for the nearest next marker, so markers can nest
+// predictably and order doesn't matter.
 function renderInline(text) {
   const nodes = [];
-  const lines = text.split('\n');
-  lines.forEach((line, lineIdx) => {
-    const parts = line.split(/(\*\*[^*]+\*\*)/g);
-    parts.forEach((part, partIdx) => {
-      const key = `${lineIdx}-${partIdx}`;
-      if (part.startsWith('**') && part.endsWith('**')) {
-        nodes.push(
-          <strong key={key} style={{ color: 'var(--ink)', fontWeight: 600 }}>
-            {part.slice(2, -2)}
-          </strong>
-        );
-      } else if (part) {
-        nodes.push(<span key={key}>{part}</span>);
-      }
+  let key = 0;
+
+  const splitLines = (s) => {
+    const out = [];
+    const parts = s.split('\n');
+    parts.forEach((line, idx) => {
+      if (line) out.push(line);
+      if (idx < parts.length - 1) out.push({ br: true });
     });
-    if (lineIdx < lines.length - 1) nodes.push(<br key={`br-${lineIdx}`} />);
-  });
+    return out;
+  };
+
+  const pushStyled = (str, style, tag) => {
+    splitLines(str).forEach(item => {
+      if (item.br) nodes.push(<br key={`k${key++}`} />);
+      else if (tag === 'a') nodes.push(
+        <a key={`k${key++}`} href={style.href} target="_blank" rel="noopener noreferrer" style={{
+          color: 'var(--accent)',
+          textDecoration: 'underline',
+          textUnderlineOffset: 2,
+        }}>{item}</a>
+      );
+      else if (tag === 'strong') nodes.push(
+        <strong key={`k${key++}`} style={{ color: 'var(--ink)', fontWeight: 600 }}>{item}</strong>
+      );
+      else if (tag === 'u') nodes.push(
+        <span key={`k${key++}`} style={{ textDecoration: 'underline', textUnderlineOffset: 2 }}>{item}</span>
+      );
+      else nodes.push(<span key={`k${key++}`}>{item}</span>);
+    });
+  };
+
+  let remaining = text;
+  const linkRe = /\[([^\]]+)\]\(([^)]+)\)/;
+  const boldRe = /\*\*([^*]+)\*\*/;
+  const uRe = /__([^_]+)__/;
+
+  while (remaining.length) {
+    const candidates = [];
+    const lm = remaining.match(linkRe);
+    if (lm) candidates.push({ type: 'a', m: lm });
+    const bm = remaining.match(boldRe);
+    if (bm) candidates.push({ type: 'strong', m: bm });
+    const um = remaining.match(uRe);
+    if (um) candidates.push({ type: 'u', m: um });
+
+    if (candidates.length === 0) {
+      pushStyled(remaining, null, 'span');
+      break;
+    }
+    // Pick the earliest match.
+    candidates.sort((a, b) => a.m.index - b.m.index);
+    const first = candidates[0];
+    const { m, type } = first;
+    if (m.index > 0) pushStyled(remaining.slice(0, m.index), null, 'span');
+    if (type === 'a') pushStyled(m[1], { href: m[2] }, 'a');
+    else pushStyled(m[1], null, type);
+    remaining = remaining.slice(m.index + m[0].length);
+  }
   return nodes;
 }

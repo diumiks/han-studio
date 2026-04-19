@@ -49,6 +49,100 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @keyframes fadeSlide { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .anim-fade { animation: fadeSlide 0.25s ease-out; }
 
+/* Responsive title used by PageHeader */
+.responsive-title {
+  font-size: 38px;
+}
+
+/* ---------- Mobile ---------- */
 @media (max-width: 768px) {
-  .responsive-sidebar { width: 100% !important; height: auto !important; position: static !important; }
+  .responsive-shell {
+    flex-direction: column !important;
+  }
+  .responsive-sidebar {
+    width: 100% !important;
+    height: auto !important;
+    position: static !important;
+    padding: 20px 18px !important;
+    border-right: none !important;
+    border-bottom: 0.5px solid var(--rule);
+  }
+  .responsive-sidebar-brand {
+    display: flex !important;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .responsive-sidebar-brand-title {
+    font-size: 20px !important;
+    white-space: nowrap;
+  }
+  .responsive-sidebar-brand-title br {
+    display: none;
+  }
+  .responsive-sidebar-rule {
+    display: none !important;
+  }
+  .responsive-nav {
+    margin-top: 14px !important;
+    flex: unset !important;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .responsive-nav::-webkit-scrollbar { display: none; }
+  .responsive-nav button {
+    flex-shrink: 0;
+    padding: 8px 12px !important;
+    font-size: 12.5px !important;
+    white-space: nowrap;
+  }
+  .responsive-sidebar-footer {
+    border-top: 0.5px solid var(--rule);
+    padding-top: 14px !important;
+    margin-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .responsive-sidebar-footer > div:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+  .responsive-main {
+    padding: 28px 20px 60px !important;
+  }
+  .responsive-title {
+    font-size: clamp(24px, 7vw, 32px) !important;
+  }
+  .responsive-stats {
+    gap: 20px !important;
+  }
+}
+
+/* ---------- Small mobile (phones in portrait) ---------- */
+@media (max-width: 480px) {
+  .responsive-main {
+    padding: 22px 16px 48px !important;
+  }
+  .responsive-title {
+    font-size: 26px !important;
+    letter-spacing: -0.01em !important;
+  }
+  .responsive-open-slots-grid {
+    grid-template-columns: 1fr !important;
+    gap: 28px !important;
+  }
+  .responsive-students-grid {
+    grid-template-columns: 1.4fr 60px 60px 100px !important;
+  }
+  .responsive-students-grid > :nth-child(2),
+  .responsive-students-grid > :nth-child(4) {
+    display: none !important;
+  }
 }

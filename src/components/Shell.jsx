@@ -24,7 +24,7 @@ export default function Shell({ children }) {
   const nav = isAdmin ? adminNav : studentNav;
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--paper)' }}>
+    <div className="responsive-shell" style={{ minHeight: '100vh', display: 'flex', background: 'var(--paper)' }}>
       <aside className="responsive-sidebar" style={{
         width: 240,
         borderRight: '0.5px solid var(--rule)',
@@ -36,28 +36,30 @@ export default function Shell({ children }) {
         height: '100vh',
         flexShrink: 0,
       }}>
-        <div>
-          <div style={{
-            fontSize: 9,
-            letterSpacing: '0.28em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-mute)',
-            marginBottom: 6,
-          }}>
-            Jacobs · Piano
+        <div className="responsive-sidebar-brand">
+          <div>
+            <div style={{
+              fontSize: 9,
+              letterSpacing: '0.28em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-mute)',
+              marginBottom: 6,
+            }}>
+              Jacobs · Piano
+            </div>
+            <div className="font-serif responsive-sidebar-brand-title" style={{
+              fontSize: 22,
+              fontStyle: 'italic',
+              lineHeight: 1.1,
+              letterSpacing: '-0.01em',
+            }}>
+              The Han<br />Studio
+            </div>
           </div>
-          <div className="font-serif" style={{
-            fontSize: 22,
-            fontStyle: 'italic',
-            lineHeight: 1.1,
-            letterSpacing: '-0.01em',
-          }}>
-            The Han<br />Studio
-          </div>
-          <div style={{ height: 1, background: 'var(--ink)', margin: '20px 0 0', width: 24 }} />
+          <div className="responsive-sidebar-rule" style={{ height: 1, background: 'var(--ink)', margin: '20px 0 0', width: 24 }} />
         </div>
 
-        <nav style={{ marginTop: 36, flex: 1 }}>
+        <nav className="responsive-nav" style={{ marginTop: 36, flex: 1 }}>
           {nav.map(item => {
             const Icon = item.icon;
             const active = location.pathname === item.to;
@@ -90,26 +92,28 @@ export default function Shell({ children }) {
           })}
         </nav>
 
-        <div style={{ borderTop: '0.5px solid var(--rule)', paddingTop: 20 }}>
-          <div style={{
-            fontSize: 10,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-mute)',
-            marginBottom: 6,
-          }}>
-            Signed in as
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>
-            {profile?.full_name || profile?.email?.split('@')[0]}
-          </div>
-          <div style={{
-            fontSize: 11,
-            color: 'var(--ink-mute)',
-            marginBottom: 16,
-            wordBreak: 'break-all',
-          }}>
-            {isAdmin ? 'Studio faculty' : profile?.email}
+        <div className="responsive-sidebar-footer" style={{ borderTop: '0.5px solid var(--rule)', paddingTop: 20 }}>
+          <div>
+            <div style={{
+              fontSize: 10,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-mute)',
+              marginBottom: 6,
+            }}>
+              Signed in as
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>
+              {profile?.full_name || profile?.email?.split('@')[0]}
+            </div>
+            <div style={{
+              fontSize: 11,
+              color: 'var(--ink-mute)',
+              marginBottom: 16,
+              wordBreak: 'break-all',
+            }}>
+              {isAdmin ? 'Studio faculty' : profile?.email}
+            </div>
           </div>
           <button onClick={signOut} style={{
             fontSize: 11,
@@ -120,14 +124,15 @@ export default function Shell({ children }) {
             display: 'flex',
             alignItems: 'center',
             gap: 5,
+            flexShrink: 0,
           }}>
             <LogOut size={12} strokeWidth={1.5} /> Sign out
           </button>
         </div>
       </aside>
 
-      <main style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
-        <div style={{ maxWidth: 960, padding: '48px 56px 80px' }}>
+      <main className="responsive-main" style={{ flex: 1, overflow: 'auto', minWidth: 0, padding: '48px 56px 80px' }}>
+        <div style={{ maxWidth: 960, margin: '0 auto' }}>
           {children}
         </div>
       </main>

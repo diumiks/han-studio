@@ -30,15 +30,23 @@ function nextOccurrenceOf(dayName) {
 export default function StudioClass() {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
-  const { upcoming, past, piecesFor, loading, refetch } = useStudioClass();
+  const { upcoming, upcomingList, past, piecesFor, loading, refetch } = useStudioClass();
   const { displayName } = useProfiles();
   const { settings } = useSettings();
 
   const defaultDay = settings.studio_default_day || 'Tuesday';
   const defaultTime = settings.studio_default_time || '19:30';
 
-  // If no real upcoming session exists, compute a virtual one from defaults.
-  const virtualDate = !upcoming ? nextOccurrenceOf(defaultDay) : null;
+  // Show a virtual "next default" only if no explicit upcoming session exists,
+  // OR the next explicit session is further out than the next default would be.
+  const virtualDate = (() => {
+    const computed = nextOccurrenceOf(defaultDay);
+    if (!computed) return null;
+    if (!upcoming) return computed;
+    // If admin has already scheduled something sooner than (or equal to) the next
+    // default occurrence, don't show the virtual card.
+    return computed < upcoming.session_date ? computed : null;
+  })();
 
   return (
     <>
@@ -52,25 +60,30 @@ export default function StudioClass() {
         <p style={{ fontSize: 13, color: 'var(--ink-mute)', fontStyle: 'italic' }} className="font-serif">Loading…</p>
       ) : (
         <>
-          {upcoming ? (
-            <UpcomingSession
-              session={upcoming}
-              isAdmin={isAdmin}
-              profile={profile}
-              piecesFor={piecesFor}
-              displayName={displayName}
-              refetch={refetch}
-            />
-          ) : virtualDate ? (
+          {virtualDate && (
             <VirtualSession
               date={virtualDate}
               time={defaultTime}
               isAdmin={isAdmin}
               refetch={refetch}
             />
-          ) : (
-            <EmptyCard isAdmin={isAdmin} />
           )}
+
+          {upcomingList.length > 0 ? (
+            upcomingList.map((s) => (
+              <UpcomingSession
+                key={s.id}
+                session={s}
+                isAdmin={isAdmin}
+                profile={profile}
+                piecesFor={piecesFor}
+                displayName={displayName}
+                refetch={refetch}
+              />
+            ))
+          ) : !virtualDate ? (
+            <EmptyCard isAdmin={isAdmin} />
+          ) : null}
 
           <PastSessions
             past={past}
@@ -78,8 +91,8 @@ export default function StudioClass() {
             displayName={displayName}
           />
 
-          {isAdmin && <AdminDefaults />}
           {isAdmin && <AdminCreateSession refetch={refetch} />}
+          {isAdmin && <AdminDefaults />}
         </>
       )}
     </>

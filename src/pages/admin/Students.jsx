@@ -83,7 +83,7 @@ export default function Students() {
         </p>
       ) : (
         <div style={{ border: '0.5px solid var(--rule)', borderRadius: 2, overflow: 'hidden' }}>
-          <div style={{
+          <div className="responsive-students-grid" style={{
             display: 'grid',
             gridTemplateColumns: '1.2fr 1.3fr 70px 70px 70px 110px',
             padding: '12px 18px',

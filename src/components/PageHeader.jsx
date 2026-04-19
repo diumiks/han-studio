@@ -12,9 +12,8 @@ export default function PageHeader({ eyebrow, title, subtitle, actions }) {
           {eyebrow}
         </div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-        <h1 className="font-serif" style={{
-          fontSize: 38,
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <h1 className="font-serif responsive-title" style={{
           fontWeight: 400,
           margin: 0,
           lineHeight: 1.1,
