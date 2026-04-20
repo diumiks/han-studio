@@ -1,7 +1,7 @@
 import { useAuth } from '../../lib/auth.jsx';
 import { useMySlots } from '../../hooks/useSlots.js';
 import { useSettings } from '../../hooks/useSettings.js';
-import { fmtDate, fmtTime, todayISO } from '../../lib/dateUtils.js';
+import { fmtDate, fmtTime, hoursUntilSlot } from '../../lib/dateUtils.js';
 import PageHeader from '../../components/PageHeader.jsx';
 import Pill from '../../components/Pill.jsx';
 
@@ -11,12 +11,13 @@ export default function MyLessons() {
   const { settings } = useSettings();
   const lessonsPerSemester = parseInt(settings.lessons_per_semester || '14', 10);
 
-  const today = todayISO();
+  // Use start time (not just date) so a lesson moves to History as soon as it begins.
+  const isPast = (s) => hoursUntilSlot(s.slot_date, s.slot_time) < 0;
   const upcoming = slots
-    .filter(s => s.slot_date >= today)
+    .filter(s => !isPast(s))
     .sort((a, b) => (a.slot_date + a.slot_time).localeCompare(b.slot_date + b.slot_time));
   const past = slots
-    .filter(s => s.slot_date < today)
+    .filter(isPast)
     .sort((a, b) => (b.slot_date + b.slot_time).localeCompare(a.slot_date + a.slot_time));
 
   const total = slots.length;

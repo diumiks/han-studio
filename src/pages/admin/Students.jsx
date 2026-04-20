@@ -4,7 +4,7 @@ import { Archive, RotateCcw, Plus, Trash2, ChevronRight } from 'lucide-react';
 import { useProfiles } from '../../hooks/useProfiles.js';
 import { useAllowedEmails } from '../../hooks/useAllowedEmails.js';
 import { supabase } from '../../lib/supabase.js';
-import { todayISO } from '../../lib/dateUtils.js';
+import { hoursUntilSlot } from '../../lib/dateUtils.js';
 import PageHeader from '../../components/PageHeader.jsx';
 import Button from '../../components/Button.jsx';
 
@@ -25,16 +25,15 @@ export default function Students() {
   useEffect(() => {
     if (profilesLoading) return;
     (async () => {
-      const today = todayISO();
       const { data: all } = await supabase
         .from('slots')
-        .select('booked_by, slot_date')
+        .select('booked_by, slot_date, slot_time')
         .not('booked_by', 'is', null);
 
       const map = {};
       (all || []).forEach(s => {
         if (!map[s.booked_by]) map[s.booked_by] = { upcoming: 0, past: 0 };
-        if (s.slot_date >= today) map[s.booked_by].upcoming++;
+        if (hoursUntilSlot(s.slot_date, s.slot_time) >= 0) map[s.booked_by].upcoming++;
         else map[s.booked_by].past++;
       });
       setCounts(map);

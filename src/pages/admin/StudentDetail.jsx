@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Archive, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
-import { fmtDate, fmtTime, todayISO } from '../../lib/dateUtils.js';
+import { fmtDate, fmtTime, todayISO, hoursUntilSlot } from '../../lib/dateUtils.js';
 import { useProfiles } from '../../hooks/useProfiles.js';
 import PageHeader from '../../components/PageHeader.jsx';
 import Button from '../../components/Button.jsx';
@@ -67,10 +67,12 @@ export default function StudentDetail() {
   }
 
   const today = todayISO();
-  const upcoming = lessons.filter(l => l.slot_date >= today);
-  const past = lessons.filter(l => l.slot_date < today);
+  const isLessonPast = (l) => hoursUntilSlot(l.slot_date, l.slot_time) < 0;
+  const upcoming = lessons.filter(l => !isLessonPast(l));
+  const past = lessons.filter(isLessonPast);
 
-  // Separate upcoming / past studio pieces
+  // Studio-class sessions don't always have a time tied to the piece row, so
+  // day-granularity is acceptable here.
   const upcomingPieces = pieces.filter(p => p.studio_class && p.studio_class.session_date >= today);
   const pastPieces = pieces.filter(p => p.studio_class && p.studio_class.session_date < today);
 
